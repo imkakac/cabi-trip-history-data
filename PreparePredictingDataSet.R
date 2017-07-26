@@ -1,4 +1,4 @@
-setwd("C:\\Users\\Ran\\OneDrive\\cabi-trip-history-data")
+setwd("C:\\Users\\ranch\\OneDrive\\cabi-trip-history-data")
 rm(list=ls(all=TRUE))
 
 library(ggplot2)
@@ -7,24 +7,27 @@ library(scales)
 library(plyr)
 library(readr)
 
-# load("FinalDataNew.rdata")
-# load("SummaryDateAndTime.rdata")
-# load("SummaryEndDateAndTime.rdata")
-# 
-# Position = !is.na(FinalDataNew$StartStationNumber) &!is.na(FinalDataNew$EndStationNumber) &
-#             FinalDataNew$StartStationNumber != 0 &  FinalDataNew$StartStationNumber != 1 &
-#             FinalDataNew$StartStationNumber != 2
-# 
-# DemandPredictionDataSet = cbind.data.frame(FinalDataNew[c(4,9)], SummaryDateAndTime[c(7,6,4,5,3)], SummaryEndDateAndTime[c(1,8,7,5,6,4)])
-# DemandPredictionDataSet$year = as.numeric(as.character(DemandPredictionDataSet$year))
-# DemandPredictionDataSet$month = as.numeric(as.character(DemandPredictionDataSet$month))
-# DemandPredictionDataSet$day = as.numeric(as.character(DemandPredictionDataSet$day))
-# DemandPredictionDataSet$hour = as.numeric(as.character(DemandPredictionDataSet$hour))
-# DemandPredictionDataSet$end_day = as.numeric(DemandPredictionDataSet$end_day)
-# DemandPredictionDataSet$end_hour = as.numeric(DemandPredictionDataSet$end_hour)
-# 
-# DemandPredictionDataSet = subset(DemandPredictionDataSet, Position)
-# save(DemandPredictionDataSet,file="DemandPredictionDataSet.rdata")
+load("FinalDataNew.rdata")
+FinalDataNew <- FinalData
+load("SummaryDateAndTime.rdata")
+load("SummaryEndDateAndTime.rdata")
+
+Position = !is.na(FinalDataNew$StartStationNumber) &!is.na(FinalDataNew$EndStationNumber) &
+            FinalDataNew$StartStationNumber != 0 &  FinalDataNew$StartStationNumber != 1 &
+            FinalDataNew$StartStationNumber != 2
+
+DemandPredictionDataSet = cbind.data.frame(FinalDataNew[c(4,9)], SummaryDateAndTime[c(7,6,4,5,3,1)], SummaryEndDateAndTime[c(1,8,7,5,6,4)])
+colnames(DemandPredictionDataSet)[8] = c('minute')
+DemandPredictionDataSet$year = as.numeric(as.character(DemandPredictionDataSet$year))
+DemandPredictionDataSet$month = as.numeric(as.character(DemandPredictionDataSet$month))
+DemandPredictionDataSet$day = as.numeric(as.character(DemandPredictionDataSet$day))
+DemandPredictionDataSet$hour = as.numeric(as.character(DemandPredictionDataSet$hour))
+DemandPredictionDataSet$minute = as.numeric(as.character(DemandPredictionDataSet$minute))%%60
+DemandPredictionDataSet$end_day = as.numeric(DemandPredictionDataSet$end_day)
+DemandPredictionDataSet$end_hour = as.numeric(DemandPredictionDataSet$end_hour)
+
+DemandPredictionDataSet = subset(DemandPredictionDataSet, Position)
+save(DemandPredictionDataSet,file="DemandPredictionDataSet.rdata")
 
 load("DemandPredictionDataSet.rdata")
 HourlyDemandPrediction.df = count(DemandPredictionDataSet,c(1,3,4,5,7))

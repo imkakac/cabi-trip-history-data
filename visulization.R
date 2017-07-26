@@ -8,6 +8,7 @@ library(readr)
 setwd("C:\\Users\\Ran\\OneDrive\\cabi-trip-history-data")
 rm(list=ls(all=TRUE))
 load("FinalDataNew.rdata")
+FinalDataNew = FinalData
 FinalData.Date = FinalDataNew$StartDate
 FinalData.StartStation = FinalDataNew$StartStationNumber
 

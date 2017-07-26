@@ -1,0 +1,23 @@
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
+*.R
+*.png
+*.bmp
+*.zip
+history data/
+paper/
+*.qvw
+*.txt
+*.csv
+*.xlsx
+*.svg
+
+
+31623 Saturday-1
+cabi-trip-history-data.Rproj
+*.docx
+DC-bikeshare/
+PreparePredictingDataSet.R
+visulization.R

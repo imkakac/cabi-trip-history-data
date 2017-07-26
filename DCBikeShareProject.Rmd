@@ -1,7 +1,7 @@
 ---
 title: "DCBikeShareProject"
 author: "Ran Cheng"
-date: "April 21, 2017"
+date: "July 25, 2017"
 output: html_document
 ---
 
@@ -10,7 +10,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 # Set working directory
-setwd("C:\\Users\\ranch\\OneDrive\\cabi-trip-history-data")
+setwd("C:\\Users\\Ran\\OneDrive\\cabi-trip-history-data")
 
 # Remove exisiting data
 rm(list=ls(all=TRUE))
@@ -37,6 +37,7 @@ https://s3.amazonaws.com/capitalbikeshare-data/index.html
 ```{r Show the raw data}
 # Public data for Capital Bike Share program in Washington DC 
 load("FinalDataNew.rdata")
+FinalDataNew <- FinalData
 head(FinalDataNew)
 ```
 
@@ -75,7 +76,7 @@ ggplot(SummaryDateAndTime, aes(x = hour, y = N, colour = month)) +
   scale_x_discrete("hour") +
   scale_y_continuous("N") +
   theme_minimal() +
-  ggtitle("People rent more bikes from April to June.") + 
+  ggtitle("People rent more bikes from April to October.") + 
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(plot.title=element_text(size=18))
 ```
@@ -122,9 +123,11 @@ head(SummaryStartStationinWeek.df)
 ## Find the top rental stations in weekday, weekend, and all week
 ```{r Create two dataframes for weekday and weekend}
 SummaryStationWeekday.df <- subset(SummaryStartStationinWeek.df[c(1,3)], 
-                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekday')
+                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekday' & 
+                                    !is.na(SummaryStartStationinWeek.df$StartStationNumber))
 SummaryStationWeekend.df <- subset(SummaryStartStationinWeek.df[c(1,3)], 
-                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekend')
+                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekend' &
+                                    !is.na(SummaryStartStationinWeek.df$StartStationNumber))
 
 # Scale the freq in weekday and weekend
 SummaryStationWeekday.df$freq <- SummaryStationWeekday.df$freq/5
@@ -210,7 +213,7 @@ Top10Stations
 ##Visualize rental demand in Station X by hour and weekday
 ```{r Visualize rental demand in Station X}
 # Top X station
-X <- 1
+X <- 8
 StationX <- Top10Stations[X]
 
 # Create a dataset for the rental demand in Station X by hour and weekday
