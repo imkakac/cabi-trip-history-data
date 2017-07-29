@@ -192,6 +192,8 @@ p
 # rm(list=ls(all=TRUE)) # remove previous data
 load("DemandPredictionDataSet.rdata") # load dataframe for predictive model
 head(DemandPredictionDataSet)
+#split the traning dataset and testing dataset by 80:20
+
 ```
 
 ## Find the overall top 10 stations
@@ -388,7 +390,7 @@ predictedWeekendDemand <- function(SelectStation,Year,Month,Hour){
 ## Predict the rental demand in Station X
 ```{r predict station X}
 # Select station X
-X <- 9
+X <- 1
 StationX <- Top10Stations[X]
 
 # Create a dataset for the rental demand in Station X by hour and weekday
@@ -446,6 +448,56 @@ plotWeekday <- ggplot()+
 plotWeekday
 ```
 ```{r predict weekend}
+#Predict weekend rental demand in Station X
+myPolyModelWeekend <- predictStationXinWeekend(StationX)
+summary(myPolyModelWeekend)
+
+# Get the predicted demand data
+predictedWeekendData = predictedWeekendDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.out.weekend$year == PredictYear & dataset.out.weekend$month == PredictMonth
+plotData <-  dataset.out.weekend[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekend <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekendData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Weekend Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekend
+```
+
+```{r predict weekday 03/2017}
+PredictYear <- 2017
+PredictMonth <- 3
+hour_grid <- seq(0, 23, 0.1)
+
+# Predict weekday rental demand in Station X
+myPolyModelWeekday <- predictStationXinWeekday(StationX)
+summary(myPolyModelWeekday)
+
+# Get the predicted demand data
+predictedWeekdayData = predictedWeekdayDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.out.weekday$year == PredictYear & dataset.out.weekday$month == PredictMonth
+plotData <-  dataset.out.weekday[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekday <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekdayData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Weekday Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekday
+```
+
+```{r predict weekend 03/2017}
 #Predict weekend rental demand in Station X
 myPolyModelWeekend <- predictStationXinWeekend(StationX)
 summary(myPolyModelWeekend)

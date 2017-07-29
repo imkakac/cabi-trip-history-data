@@ -1,0 +1,544 @@
+---
+title: "DCBikeShareProject"
+author: "Ran Cheng"
+date: "July 25, 2017"
+output: html_document
+---
+
+## Set working directory and remove exisiting data
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Set working directory
+setwd("C:\\Users\\Ran\\OneDrive\\cabi-trip-history-data")
+
+# Remove exisiting data
+rm(list=ls(all=TRUE))
+```
+
+## Load libraries
+```{r load libraries}
+# Load libraries
+library(ggplot2)
+library(lubridate)
+library(scales)
+library(plyr)
+library(readr)
+library(ggmap)
+library(plotly)
+```
+
+
+## Show the link to the data and raw data
+Link for Capital Bike Share program in Washington DC
+https://s3.amazonaws.com/capitalbikeshare-data/index.html
+
+## Show the raw data
+```{r Show the raw data}
+# Public data for Capital Bike Share program in Washington DC 
+load("FinalDataNew.rdata")
+FinalDataNew <- FinalData
+head(FinalDataNew)
+```
+
+##Show the dimension of the raw data
+```{r Show the dimension of the raw data}
+dim(FinalDataNew) # the length of the data is 13,623,103
+```
+
+##Summarize DC bike share data at different time for data visulization
+```{r summarize DC bike share data at different time}
+# Load the starting date and time of all bike rentals
+load("SummaryDateAndTime.rdata")
+head(SummaryDateAndTime)
+# Count rental event by year
+year_summary <- ddply(SummaryDateAndTime,.(year),summarise,N = length(year))
+
+# Count rental event by month and hour
+month_summary <- ddply(SummaryDateAndTime,.(month,hour),summarise, N = length(hour))
+
+# Count rental event by weeday and hour
+weekday_summary <- ddply(SummaryDateAndTime,.(weekday,hour),summarise, N = length(hour))
+```
+## Visualize DC bike share data at different year (2010 only has Q4 data, and 2016 only has Q1, Q2 data)
+```{r Visualize DC bike share data at different year}
+ggplot(data=year_summary, aes(x=year, y=N)) +
+  geom_bar(stat="identity")+
+  # Add text at top of bars
+  geom_text(data=year_summary,aes(x=year,y=N,label=N),vjust=0)
+```
+
+## Visualize DC bike share data at different month
+```{r Visualize DC bike share data at different month}
+ggplot(SummaryDateAndTime, aes(x = hour, y = N, colour = month)) +
+  geom_point(data = month_summary, aes(group = month)) +
+  geom_line(data = month_summary, aes(group = month)) +
+  scale_x_discrete("hour") +
+  scale_y_continuous("N") +
+  theme_minimal() +
+  ggtitle("People rent more bikes from April to October.") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.title=element_text(size=18))
+```
+
+## Visualize the different rental demands at weekday and weekend
+```{r Visualize DC bike share data at weekday and weekend}
+ggplot(SummaryDateAndTime, aes(x = hour, y = N, colour = weekday)) +
+  geom_point(data = weekday_summary, aes(group = weekday)) +
+  geom_line(data = weekday_summary, aes(group = weekday)) +
+  scale_x_discrete("hour") +
+  scale_y_continuous("N") +
+  theme_minimal() +
+  ggtitle("Different demands in weekday and weekend.\n") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.title=element_text(size=18))
+```
+
+## Find the popular rental stations
+## Create a dataframe with start station number and day
+```{r Create a dataframe with start station number and day}
+# Create a dataframe with StartStationNumber and Weekday
+StartStationinWeek.df <- data.frame(FinalDataNew$StartStationNumber, SummaryDateAndTime$weekday)
+colnames(StartStationinWeek.df) <- c('StartStationNumber', 'SummaryWeekday')
+head(StartStationinWeek.df)
+```
+
+## Group the days by weekday and weekend
+```{r Group the days by weekday and weekend}
+weekends <- c('Saturday', 'Sunday') #define Sat and Sun as weekend
+# If the day is Saturday or Sunday, labels the day as "weekend", other wise labels it as "weekday"
+StartStationinWeek.df$SummaryWeekday <- factor((StartStationinWeek.df$SummaryWeekday %in% weekends), 
+       levels=c(TRUE, FALSE), labels=c('weekend', 'weekday')) 
+colnames(StartStationinWeek.df) <- c('StartStationNumber', 'WeekdayOrWeekend')
+head(StartStationinWeek.df)
+```
+
+## Count the rental event by station and weekday/weekend
+```{r Count the rental event by station and weekday/weekend}
+library(plyr)
+SummaryStartStationinWeek.df <- count(StartStationinWeek.df, c('StartStationNumber', 'WeekdayOrWeekend')) 
+head(SummaryStartStationinWeek.df)
+```
+
+## Find the top rental stations in weekday, weekend, and all week
+```{r Create two dataframes for weekday and weekend}
+SummaryStationWeekday.df <- subset(SummaryStartStationinWeek.df[c(1,3)], 
+                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekday' & 
+                                    !is.na(SummaryStartStationinWeek.df$StartStationNumber))
+SummaryStationWeekend.df <- subset(SummaryStartStationinWeek.df[c(1,3)], 
+                                  SummaryStartStationinWeek.df$WeekdayOrWeekend == 'weekend' &
+                                    !is.na(SummaryStartStationinWeek.df$StartStationNumber))
+
+# Scale the freq in weekday and weekend
+SummaryStationWeekday.df$freq <- SummaryStationWeekday.df$freq/5
+SummaryStationWeekend.df$freq <- SummaryStationWeekend.df$freq/2
+
+# Sort the Station by freq (from high to low)
+SummaryStationWeekday.df <- SummaryStationWeekday.df[order(-SummaryStationWeekday.df$freq),]
+SummaryStationWeekend.df <- SummaryStationWeekend.df[order(-SummaryStationWeekend.df$freq),]
+
+# Find the top 5 rental station in weekday
+Top5StationInWeekday.df <- SummaryStationWeekday.df[1:5,]
+TopStationInWeekday.df <- cbind(Top5StationInWeekday.df[1], 'Weekday')
+colnames(TopStationInWeekday.df)[2] <- 'Week'
+
+# Find the top 5 rental station in weekend
+Top5StationInWeekend.df <- SummaryStationWeekend.df[1:5,]
+TopStationInWeekend.df <- cbind(Top5StationInWeekend.df[1], 'Weekend')
+colnames(TopStationInWeekend.df)[2] <- 'Week'
+
+# Merge the top 5 rental staions in weekday and weekend
+TopStationInWeek.df <- merge(TopStationInWeekday.df,TopStationInWeekend.df, by = 'StartStationNumber', all = TRUE)
+TopStationInWeek.df$Week.x <- as.character(TopStationInWeek.df$Week.x)
+
+# If the station in included in both weekday and weekend stations label it as top stations all week
+TopStationInWeek.df$Week.x[!is.na(TopStationInWeek.df$Week.x) & !is.na(TopStationInWeek.df$Week.y)] <- 'AllWeek'
+TopStationInWeek.df$Week.x[is.na(TopStationInWeek.df$Week.x)] <- 'Weekend'
+TopStationInWeek.df <- TopStationInWeek.df[1:2]
+colnames(TopStationInWeek.df)[2] <- 'TopRentalStations'
+TopStationInWeek.df
+```
+
+## Extract the GPS info of stations from the online XML file
+```{r Extract the GPS info of stations from the online XML file,include = FALSE, cache=FALSE}
+library(XML)
+# Extracting the station number and GPS info from online
+xml.url <- 'http://feeds.capitalbikeshare.com/stations/stations.xml'
+fileURL <- sub('https', 'http', xml.url)
+xmlfile <- xmlTreeParse(fileURL)
+class(xmlfile)
+xmltop <- xmlRoot(xmlfile)
+
+# Read the station info from xml
+StationInfo <- xmlSApply(xmltop, function(x) xmlSApply(x, xmlValue))
+StationInfo.df <- data.frame(t(StationInfo),row.names=NULL)
+StationInfo.df$lat <- as.numeric(as.character(StationInfo.df$lat))
+StationInfo.df$long <- as.numeric(as.character(StationInfo.df$long))
+colnames(StationInfo.df) [3] <- 'StartStationNumber'
+TopStationInWeek.df2 <- merge(TopStationInWeek.df, StationInfo.df, by = 'StartStationNumber')
+
+# Get the google map of DC using google map API
+DC <- get_map(location = "Washington DC", zoom=13, source = "google", messaging = FALSE)
+DCMap <- ggmap(DC)
+```
+## Plot the popular rental stations on Google map
+```{r Plot the popular rental stations on Google map}
+p <- DCMap + geom_point(data=TopStationInWeek.df2, aes(x = long, y = lat, color = TopRentalStations), size=5, alpha=1)
+p
+```
+
+## Predict the bike rental demand in popular stations
+```{r Predict the bike rental demand in popular stations}
+# rm(list=ls(all=TRUE)) # remove previous data
+load("DemandPredictionDataSet.rdata") # load dataframe for predictive model
+head(DemandPredictionDataSet)
+#split the traning dataset and testing dataset by 80:20
+library(caTools)
+set.seed(123)
+split = sample.split(DemandPredictionDataSet$StartStationNumber, SplitRatio = 0.6)
+training_set = subset(DemandPredictionDataSet, split == TRUE)
+test_set = subset(DemandPredictionDataSet, split == FALSE)
+```
+
+## Find the overall top 10 stations
+```{r find the top 10 stations}
+# Count rental demand in each hour by start station
+HourlyDemandPrediction.df <- count(training_set,c(1,3,4,5,7))
+
+# Count rental demand in each hour by end station
+HourlyDemandPrediction.end.df <- count(training_set,c(9,10,11,13,14))
+TopStations <- count(training_set,c('StartStationNumber'))
+TopStations$StartStationNumber <- as.numeric(as.character(TopStations$StartStationNumber))
+# Sort the stations by frequency
+TopStations <- TopStations[order(-TopStations$freq), ]
+# Get top 10 stations 
+Top10Stations <- head(TopStations$StartStationNumber,10)
+Top10Stations
+```
+
+##Visualize rental demand in Station X by hour and weekday
+```{r Visualize rental demand in Station X}
+# Top X station
+X <- 8
+StationX <- Top10Stations[X]
+
+# Create a dataset for the rental demand in Station X by hour and weekday
+
+# Get the data only for Station X
+StationX.df <- subset(training_set, training_set$StartStationNumber == StationX)
+
+# Count the rental demand in Station X by hour
+StationX.summary <- ddply(StationX.df,.(month,weekday,hour),summarise,N = length(hour))
+StationX.summary.detail <- ddply(StationX.df,.(year,month,day,weekday,hour),summarise,N = length(hour))
+
+# Count the returned bike in Station X by hour
+EndStationX.df <- subset(training_set, training_set$EndStationNumber == StationX)
+EndStationX.summary.detail <- ddply(EndStationX.df,.(end_year,end_month,end_day,end_weekday,end_hour),
+                         summarise,N = length(end_hour))
+colnames(EndStationX.summary.detail)[1:5] <- c('year','month','day','weekday','hour')
+
+# Count the rental demand in Station X by hour and weekday
+StationX.DayAndHour <- aggregate(N ~ weekday + hour, data = StationX.summary, FUN = sum)
+
+# Visualize the rental demand in Station X by hour and weekday
+ggplot(StationX.DayAndHour, aes(x = as.factor(hour), y = N, colour = weekday)) +
+  geom_point(data = StationX.DayAndHour, aes(group = weekday)) +
+  geom_line(data = StationX.DayAndHour, aes(group = weekday)) +
+  scale_x_discrete("hour") +
+  scale_y_continuous("N") +
+  theme_minimal() +
+  ggtitle(sprintf("Rental Demand in Station %d", Top10Stations[X])) + 
+  theme_minimal() +
+  theme(plot.title=element_text(size=18))+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Visualize rental demand in Station X by hour and month in 3D
+```{r Visualize rental demand in Station X by hour and month in 3D}
+library(plotly)
+# Get the rental demand of station X on Mondays at each hour and each month 
+Demand <- xtabs(N ~ hour + month, data = subset(StationX.summary, StationX.summary$weekday == 'Monday'))
+plot_ly(x = 1:12, z = Demand, type = "surface") %>%
+     layout(scene = list(title = "Rental Demand on Saturdays in Station 31623, x = month, y= hour, z1 = count", xaxis = list(title = "Month"), yaxis = list(title = "Hour"), zaxis = list(title = "Demand")))
+
+```
+
+## Prepare functions for create the predictive model 
+## Polynomial model with the input of station number, year, month, weekday, and hour
+```{r functions for polynomial model}
+# Stations that use 12th polynomial model
+Model1Station <- c(31623, 31201, 31258, 31247, 31229, 31214, 31101, 31613)
+
+# Stations that use 10th polynomial model
+Model2Station <- c(31200, 31241)
+
+# 12th polynomial model for weekday 
+weekdayPolyModel1 <- function(input_dataset){
+  dataset.out.weekday <- input_dataset
+  dataset.out.weekday$year_p2 <- dataset.out.weekday$year^2
+  dataset.out.weekday$month_p2 <- dataset.out.weekday$month^2
+  dataset.out.weekday$hour_p2 <- dataset.out.weekday$hour^2
+  dataset.out.weekday$hour_p3 <- dataset.out.weekday$hour^3
+  dataset.out.weekday$hour_p4 <- dataset.out.weekday$hour^4
+  dataset.out.weekday$hour_p5 <- dataset.out.weekday$hour^5
+  dataset.out.weekday$hour_p6 <- dataset.out.weekday$hour^6
+  dataset.out.weekday$hour_p7 <- dataset.out.weekday$hour^7
+  dataset.out.weekday$hour_p8 <- dataset.out.weekday$hour^8
+  dataset.out.weekday$hour_p9 <- dataset.out.weekday$hour^9
+  dataset.out.weekday$hour_p10 <- dataset.out.weekday$hour^10
+  dataset.out.weekday$hour_p11 <- dataset.out.weekday$hour^11
+  dataset.out.weekday$hour_p12 <- dataset.out.weekday$hour^12
+  # Fitting the polynomial regression
+  regressor.weekday <- lm(formula = out ~ year+year_p2+month+month_p2+hour+hour_p2+hour_p3+hour_p4
+                      +hour_p5+hour_p6+hour_p7+hour_p8+hour_p9+hour_p10+hour_p11+hour_p12,
+                       data = dataset.out.weekday)
+  # Function returns the regressor for weekday
+  return(regressor.weekday)
+}
+
+# 10th polynomial model for weekday 
+weekdayPolyModel2 <- function(input_dataset){
+  dataset.out.weekday <- input_dataset
+  dataset.out.weekday$year_p2 <- dataset.out.weekday$year^2
+  dataset.out.weekday$month_p2 <- dataset.out.weekday$month^2
+  dataset.out.weekday$hour_p2 <- dataset.out.weekday$hour^2
+  dataset.out.weekday$hour_p3 <- dataset.out.weekday$hour^3
+  dataset.out.weekday$hour_p4 <- dataset.out.weekday$hour^4
+  dataset.out.weekday$hour_p5 <- dataset.out.weekday$hour^5
+  dataset.out.weekday$hour_p6 <- dataset.out.weekday$hour^6
+  dataset.out.weekday$hour_p7 <- dataset.out.weekday$hour^7
+  dataset.out.weekday$hour_p8 <- dataset.out.weekday$hour^8
+  dataset.out.weekday$hour_p9 <- dataset.out.weekday$hour^9
+  dataset.out.weekday$hour_p10 <- dataset.out.weekday$hour^10
+  # Fitting the polynomial regression
+  regressor.weekday <- lm(formula = out ~ year+year_p2+month+month_p2+hour+hour_p2+hour_p3+hour_p4+
+                            hour_p5+hour_p6+hour_p7+hour_p8+hour_p9+hour_p10,
+                       data = dataset.out.weekday)
+  return(regressor.weekday)
+}
+
+# 4th polynomial model for weekend
+weekendPolyModel <- function(input_dataset){
+  dataset.out.weekday <- input_dataset
+  dataset.out.weekend$year_p2 <- dataset.out.weekend$year^2
+  dataset.out.weekend$month_p2 <- dataset.out.weekend$month^2
+  dataset.out.weekend$hour_p2 <- dataset.out.weekend$hour^2
+  dataset.out.weekend$hour_p3 <- dataset.out.weekend$hour^3
+  dataset.out.weekend$hour_p4 <- dataset.out.weekend$hour^4
+  # Fitting the polynomial regression
+  regressor.weekend <- lm(formula = out ~ year+year_p2+month+month_p2+
+                                    hour+hour_p2+hour_p3+hour_p4,
+                       data = dataset.out.weekend)
+  # Function returns the regressor for weekday
+  return(regressor.weekend)
+}
+
+# Function to select the model for weekday prediction
+predictStationXinWeekday <-  function(SelectStation){
+  # If the station number is in Model1 then use Model1 (12th poly)
+  if (SelectStation %in% Model1Station){
+    RegressorWeekday = weekdayPolyModel1(dataset.out.weekday)
+  }
+  # If the station number is in Model2 then use Model2 (10th poly)
+  if (SelectStation %in% Model2Station){
+    RegressorWeekday = weekdayPolyModel2(dataset.out.weekday)
+  } 
+  return(RegressorWeekday)
+}
+
+# Function to use model (4th poly) for weekend prediction
+predictStationXinWeekend <-  function(SelectStation){
+  RegressorWeekend = weekendPolyModel(dataset.out.weekend)
+  return(RegressorWeekend)
+}
+
+# Function to create the predicted dataset in weekday
+predictedWeekdayDemand <- function(SelectStation,Year,Month,Hour){
+  # Select the model 1 (12th poly)
+  if (SelectStation %in% Model1Station){
+    modeldata <-  data.frame(year = Year, year_p2 = Year^2, month = Month, month_p2 = Month^2,
+                            hour = Hour, hour_p2 = Hour^2, hour_p3 = Hour^3, hour_p4 = Hour^4,
+                            hour_p5 = Hour^5, hour_p6 = Hour^6, hour_p7 = Hour^7, hour_p8 = Hour^8,
+                            hour_p9 = Hour^9, hour_p10 = Hour^10, hour_p11 = Hour^11, hour_p12 = Hour^12)  
+  }
+  # Select the model 2 (10th poly)
+  if (SelectStation %in% Model2Station){
+    modeldata <-  data.frame(year = Year, year_p2 = Year^2, month = Month, month_p2 = Month^2,
+                            hour = Hour, hour_p2 = Hour^2, hour_p3 = Hour^3, hour_p4 = Hour^4,
+                            hour_p5 = Hour^5, hour_p6 = Hour^6, hour_p7 = Hour^7, hour_p8 = Hour^8,
+                            hour_p9 = Hour^9, hour_p10 = Hour^10) 
+  }
+  # Create the predicted dataset in weekday
+  predictedWeekdayData = cbind.data.frame(hour = Hour, 
+                                          demand = predict(myPolyModelWeekday,newdata = modeldata))
+  # Return the predicted dataset in weekday
+  return(predictedWeekdayData)
+}
+
+# Function to create the predicted dataset in weekend
+predictedWeekendDemand <- function(SelectStation,Year,Month,Hour){
+  # Use 4th poly model
+  modeldata <-  data.frame(year = Year, year_p2 = Year^2, month = Month, month_p2 = Month^2,
+                            hour = Hour, hour_p2 = Hour^2, hour_p3 = Hour^3, hour_p4 = Hour^4)  
+  # Create the predicted dataset in weekend
+  predictedWeekendData = cbind.data.frame(hour = Hour, 
+                                             demand = predict(myPolyModelWeekend,newdata = modeldata))
+  # Return the predicted dataset in weekend
+  return(predictedWeekendData)
+}
+
+```
+
+
+## Predict the rental demand in Station X
+```{r predict station X}
+# Select station X
+X <- 1
+StationX <- Top10Stations[X]
+
+# Create a dataset for the rental demand in Station X by hour and weekday
+
+# Count the rental demand in Station X by hour
+StationX.df <- subset(training_set, training_set$StartStationNumber == StationX)
+StationX.test.df <- subset(test_set, test_set$StartStationNumber == StationX)
+
+# Count the rental demand in Station X by hour
+StationX.summary <- ddply(StationX.df,.(month,weekday,hour),summarise,N = length(hour))
+StationX.summary.detail <- ddply(StationX.df,.(year,month,day,weekday,hour),summarise,N = length(hour))
+
+StationX.test.summary <- ddply(StationX.test.df,.(month,weekday,hour),summarise,N = length(hour))
+StationX.test.summary.detail <- ddply(StationX.test.df,.(year,month,day,weekday,hour),summarise,N = length(hour))
+
+# Count the returned bike in Station X by hour
+EndStationX.df <- subset(training_set, training_set$EndStationNumber == StationX)
+EndStationX.summary.detail <- ddply(EndStationX.df,.(end_year,end_month,end_day,end_weekday,end_hour),
+                         summarise,N = length(end_hour))
+colnames(EndStationX.summary.detail)[1:5] <- c('year','month','day','weekday','hour')
+StationX.demand.detail <- merge.data.frame(StationX.summary.detail, EndStationX.summary.detail,
+                                   by = c('year','month','day','weekday','hour'),
+                                   all = TRUE)
+StationX.demand.detail[is.na(StationX.demand.detail)] <- 0
+colnames(StationX.demand.detail)[6:7] <- c('out','In')
+StationX.demand.detail$netout <- StationX.demand.detail$out - StationX.demand.detail$In
+dataset.out <- StationX.demand.detail[c(1:5,6)]  
+#####
+EndStationX.test.df <- subset(test_set, test_set$EndStationNumber == StationX)
+EndStationX.test.summary.detail <- ddply(EndStationX.test.df,.(end_year,end_month,end_day,end_weekday,end_hour),
+                         summarise,N = length(end_hour))
+colnames(EndStationX.test.summary.detail)[1:5] <- c('year','month','day','weekday','hour')
+StationX.test.demand.detail <- merge.data.frame(StationX.test.summary.detail, EndStationX.test.summary.detail,
+                                   by = c('year','month','day','weekday','hour'),
+                                   all = TRUE)
+StationX.test.demand.detail[is.na(StationX.test.demand.detail)] <- 0
+colnames(StationX.test.demand.detail)[6:7] <- c('out','In')
+StationX.test.demand.detail$netout <- StationX.test.demand.detail$out - StationX.test.demand.detail$In
+dataset.test.out <- StationX.test.demand.detail[c(1:5,6)]  
+# Create the dataset for weekday and weekend
+weekend.position <- dataset.out$weekday == 'Saturday' | dataset.out$weekday == 'Sunday'
+dataset.out.weekday <- subset(dataset.out, weekend.position == FALSE)
+dataset.out.weekend <- subset(dataset.out, weekend.position == TRUE)
+
+weekend.test.position <- dataset.test.out$weekday == 'Saturday' | dataset.test.out$weekday == 'Sunday'
+dataset.test.out.weekday <- subset(dataset.test.out, weekend.test.position == FALSE)
+dataset.test.out.weekend <- subset(dataset.test.out, weekend.test.position == TRUE)
+```
+
+```{r predict weekday}
+PredictYear <- 2015
+PredictMonth <- 6
+hour_grid <- seq(0, 23, 0.1)
+
+# Predict weekday rental demand in Station X
+myPolyModelWeekday <- predictStationXinWeekday(StationX)
+summary(myPolyModelWeekday)
+
+# Get the predicted demand data
+predictedWeekdayData = predictedWeekdayDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.out.weekday$year == PredictYear & dataset.out.weekday$month == PredictMonth
+plotData <-  dataset.out.weekday[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekday <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekdayData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Training set: Weekday Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekday
+```
+```{r predict weekend}
+#Predict weekend rental demand in Station X
+myPolyModelWeekend <- predictStationXinWeekend(StationX)
+summary(myPolyModelWeekend)
+
+# Get the predicted demand data
+predictedWeekendData = predictedWeekendDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.out.weekend$year == PredictYear & dataset.out.weekend$month == PredictMonth
+plotData <-  dataset.out.weekend[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekend <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekendData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Training set: Weekend Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekend
+```
+
+```{r predict weekday 03/2017}
+PredictYear <- 2015
+PredictMonth <- 6
+hour_grid <- seq(0, 23, 0.1)
+
+# Predict weekday rental demand in Station X
+myPolyModelWeekday <- predictStationXinWeekday(StationX)
+summary(myPolyModelWeekday)
+
+# Get the predicted demand data
+predictedWeekdayData = predictedWeekdayDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.test.out.weekday$year == PredictYear & dataset.test.out.weekday$month == PredictMonth
+plotData <-  dataset.test.out.weekday[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekday <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekdayData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Testing set: Weekday Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekday
+```
+
+```{r predict weekend 03/2017}
+#Predict weekend rental demand in Station X
+myPolyModelWeekend <- predictStationXinWeekend(StationX)
+summary(myPolyModelWeekend)
+
+# Get the predicted demand data
+predictedWeekendData = predictedWeekendDemand(StationX,PredictYear,PredictMonth,hour_grid)
+
+# Get the actual deamnd data in the month and year
+PointToPlot1 <- dataset.test.out.weekend$year == PredictYear & dataset.test.out.weekend$month == PredictMonth
+plotData <-  dataset.test.out.weekend[PointToPlot1, c(5,6)]
+
+# Plot the boxplot of the actual data and lineplot of the predicted data
+plotWeekend <- ggplot()+
+  geom_boxplot(data = plotData,aes(x=hour,y =out, group = hour))+
+  geom_line(data = predictedWeekendData, aes(x=hour, y=demand), colour = 'blue',group = 1) +
+  ggtitle(paste("Testing set: Weekend Rental Demand at Station ",StationX, " in ",PredictYear, "-", PredictMonth, sep = "")) +
+  xlab('Hour') +
+  ylab('Demand')+
+  theme(plot.title = element_text(hjust = 0.5))
+plotWeekend
+```
